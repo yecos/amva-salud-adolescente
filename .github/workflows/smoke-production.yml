@@ -25,6 +25,8 @@ jobs:
           echo "$body" | grep -q '"ok":true'
           echo "$body" | grep -q '"database":"connected"'
           echo "$body" | grep -q '"schema":"ready"'
+          echo "$body" | grep -q '"neon_project_id":"noisy-bonus-40050798"'
+          echo "$body" | grep -q '"neon_branch_id":"br-divine-lab-b4in309p"'
 
       - name: Check production dashboard data
         shell: bash
