@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 type DeepHealthRow = {
@@ -10,16 +11,20 @@ type DeepHealthRow = {
 };
 
 export async function GET() {
+  let identity: DeepHealthRow | null = null;
+
   try {
-    const [identity, municipalityCount, submissionCount, populationCount] = await Promise.all([
-      prisma.$queryRaw<DeepHealthRow[]>`
-        SELECT
-          current_database() AS database_name,
-          current_user AS database_user,
-          current_setting('neon.project_id', true) AS neon_project_id,
-          current_setting('neon.branch_id', true) AS neon_branch_id,
-          current_setting('neon.endpoint_id', true) AS neon_endpoint_id
-      `,
+    const rows = await prisma.$queryRaw<DeepHealthRow[]>`
+      SELECT
+        current_database() AS database_name,
+        current_user AS database_user,
+        current_setting('neon.project_id', true) AS neon_project_id,
+        current_setting('neon.branch_id', true) AS neon_branch_id,
+        current_setting('neon.endpoint_id', true) AS neon_endpoint_id
+    `;
+    identity = rows[0] ?? null;
+
+    const [municipalityCount, submissionCount, populationCount] = await Promise.all([
       prisma.municipality.count(),
       prisma.submission.count(),
       prisma.population.count(),
@@ -29,7 +34,7 @@ export async function GET() {
       ok: true,
       database: "connected",
       schema: "ready",
-      identity: identity[0] ?? null,
+      identity,
       counts: {
         municipalities: municipalityCount,
         submissions: submissionCount,
@@ -38,12 +43,28 @@ export async function GET() {
     });
   } catch (error) {
     console.error(error);
+
+    const known = error instanceof Prisma.PrismaClientKnownRequestError
+      ? {
+          code: error.code,
+          meta: error.meta
+            ? {
+                modelName: typeof error.meta.modelName === "string" ? error.meta.modelName : null,
+                table: typeof error.meta.table === "string" ? error.meta.table : null,
+                column: typeof error.meta.column === "string" ? error.meta.column : null,
+              }
+            : null,
+        }
+      : null;
+
     return NextResponse.json(
       {
         ok: false,
-        database: "connected",
+        database: identity ? "connected" : "error",
         schema: "error",
+        identity,
         error: error instanceof Error ? error.name : "UnknownError",
+        prisma: known,
       },
       { status: 503 },
     );
