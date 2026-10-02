@@ -17,25 +17,25 @@ jobs:
         run: |
           set -euo pipefail
           URL="https://amva-salud-adolescente.vercel.app/api/health"
-          for attempt in {1..10}; do
-            echo "Health check attempt $attempt"
-            if body="$(curl --fail --silent --show-error --max-time 15 "$URL")"; then
-              echo "$body"
-              echo "$body" | grep -q '"ok":true'
-              echo "$body" | grep -q '"database":"connected"'
-              break
-            fi
-            if [ "$attempt" -eq 10 ]; then exit 1; fi
-            sleep 15
-          done
+          response="$(curl --silent --show-error --max-time 20 --write-out $'\nHTTP_STATUS:%{http_code}' "$URL")"
+          echo "$response"
+          body="$(printf '%s\n' "$response" | sed '/HTTP_STATUS:/d')"
+          status="$(printf '%s\n' "$response" | sed -n 's/^HTTP_STATUS://p')"
+          test "$status" = "200"
+          echo "$body" | grep -q '"ok":true'
+          echo "$body" | grep -q '"database":"connected"'
+          echo "$body" | grep -q '"schema":"ready"'
 
       - name: Check production dashboard data
         shell: bash
         run: |
           set -euo pipefail
           URL="https://amva-salud-adolescente.vercel.app/api/dashboard/summary?year=2026"
-          body="$(curl --fail --silent --show-error --max-time 20 "$URL")"
-          echo "$body"
+          response="$(curl --silent --show-error --max-time 20 --write-out $'\nHTTP_STATUS:%{http_code}' "$URL")"
+          echo "$response"
+          body="$(printf '%s\n' "$response" | sed '/HTTP_STATUS:/d')"
+          status="$(printf '%s\n' "$response" | sed -n 's/^HTTP_STATUS://p')"
+          test "$status" = "200"
           echo "$body" | grep -q '"ok":true'
           echo "$body" | grep -Eq '"morbidity":[1-9][0-9]*'
           echo "$body" | grep -Eq '"mortality":[1-9][0-9]*'
