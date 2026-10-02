@@ -1,0 +1,31 @@
+name: Production smoke test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Vercel production deployment
+        run: sleep 60
+
+      - name: Check application health
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://amva-salud-adolescente.vercel.app/api/health"
+          for attempt in {1..10}; do
+            echo "Health check attempt $attempt"
+            if body="$(curl --fail --silent --show-error --max-time 15 "$URL")"; then
+              echo "$body"
+              echo "$body" | grep -q '"ok":true'
+              echo "$body" | grep -q '"database":"connected"'
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Production health check failed"
+          exit 1
